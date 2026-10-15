@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   first_index INTEGER NOT NULL,
   count       INTEGER NOT NULL,
   data        TEXT NOT NULL,
+  rx_time     REAL NOT NULL,
   uploaded    INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (session_id, sensor, first_index)
 );
@@ -105,8 +106,9 @@ class Store:
 
     # ---- writes (call inside a transaction) -------------------------------
     def add_chunk(self, sid, sensor, first, rows):
-        self.db.execute("INSERT INTO chunks(session_id,sensor,first_index,count,data) VALUES(?,?,?,?,?)",
-                        (sid, sensor, first, len(rows), json.dumps(rows, separators=(",", ":"))))
+        # rx_time is informational only (used to report latency); no logic depends on the wall clock
+        self.db.execute("INSERT INTO chunks(session_id,sensor,first_index,count,data,rx_time) VALUES(?,?,?,?,?,?)",
+                        (sid, sensor, first, len(rows), json.dumps(rows, separators=(",", ":")), time.time()))
         self.db.execute("UPDATE progress SET next_index=? WHERE session_id=? AND sensor=?",
                         (first + len(rows), sid, sensor))
 

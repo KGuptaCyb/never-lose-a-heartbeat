@@ -39,7 +39,12 @@ def window_stats(s1, s2, w):
             out.setdefault("min", {})["sensor%d" % sensor] = [None] * nch
             out.setdefault("max", {})["sensor%d" % sensor] = [None] * nch
         if sensor == 2:
-            out["magnitude"] = r1(sum(math.sqrt(r[0] * r[0] + r[1] * r[1]) for r in rows) / len(rows)) if rows else None
+            # plain left-to-right addition (not sum(), which is compensated in
+            # Python 3.12+) so the TypeScript port gives bit-identical results
+            acc = 0.0
+            for r in rows:
+                acc += math.sqrt(r[0] * r[0] + r[1] * r[1])
+            out["magnitude"] = r1(acc / len(rows)) if rows else None
     out["complete"] = out["missing_1"] == 0 and out["missing_2"] == 0
     return out
 
