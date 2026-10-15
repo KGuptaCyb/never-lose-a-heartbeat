@@ -78,6 +78,7 @@ sudo python3 scripts/measure_resources.py --seconds 3600 --iface eth0
 ```
 
 These run, in order:
+
 1. processing tests, including a check against a naive implementation of the peak definition;
 2. the TypeScript port, which must give identical output on the golden cases;
 3. on the device: network cut, `kill -9`, disk full, clock change, then full verification;

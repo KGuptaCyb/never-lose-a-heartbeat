@@ -25,6 +25,7 @@ Run 2 is the run after the fixes: [failure_tests_run2.log](failure_tests_run2.lo
 | Python vs TypeScript processing (golden test, 80 windows with gaps) | Identical | 7 ✅ |
 
 Run 1 ([failure_tests_run1_before_fixes.log](failure_tests_run1_before_fixes.log)) found 2 real problems, both fixed:
+
 - **Switching to offline took 24 s.** Each failed HTTPS call waited the full timeout once per resolved IP address. The fix was a hard deadline per call, plus a quick health check to confirm a failure.
 - **Cloud database connections ran out.** The fix was one short-lived connection per request.
 
@@ -49,6 +50,7 @@ Latency here is measured from the moment the device received the last sample a w
 ## Extra: disk full for longer than the mock's buffer, with no reserve left
 
 This test ran on macOS using an 8 MB RAM disk.
+
 - The disk was kept full for 25 s, which is longer than the mock's 10 s buffer, so samples overflowed.
 - The overflow was recorded as **lost, with the reason `buffer_overflow (device disk was full)`**: 6,054 samples per sensor, as one range.
 - There were no silent gaps and no wrong values (`check_export.py`: OK).
