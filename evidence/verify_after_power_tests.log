@@ -1,0 +1,28 @@
+== VERIFY: every session, device export vs ramp formula, cloud copy vs device copy
+waiting for the cloud to catch up: .120343691 s
+-- session d73e954a
+sensor 1: 11959 samples, 0 lost in 1 ranges, open loss from 11959, reasons ['mock_restarted: unread data of old session not delivered']
+sensor 2: 11969 samples, 0 lost in 1 ranges, open loss from 11969, reasons ['mock_restarted: unread data of old session not delivered']
+OK
+cloud copy identical (23930 lines)
+-- session 502e8b47
+sensor 1: 417944 samples, 0 lost in 1 ranges, open loss from 417944, reasons ['mock_restarted: unread data of old session not delivered']
+sensor 2: 417954 samples, 0 lost in 1 ranges, open loss from 417954, reasons ['mock_restarted: unread data of old session not delivered']
+OK
+cloud copy identical (835900 lines)
+-- session 8b904c32
+sensor 1: 11688 samples, 0 lost in 1 ranges, open loss from 11688, reasons ['mock_restarted: unread data of old session not delivered']
+sensor 2: 11696 samples, 0 lost in 1 ranges, open loss from 11696, reasons ['mock_restarted: unread data of old session not delivered']
+OK
+cloud copy identical (23386 lines)
+-- session 7ab79e9b
+sensor 1: 19871 samples, 0 lost in 0 ranges, reasons []
+sensor 2: 19880 samples, 0 lost in 0 ranges, reasons []
+OK
+CLOUD COPY DIFFERS
+10970a10971,10979
+> {"sensor": 1, "index": 19871, "values": [59614, 59615, 59616]}
+> {"sensor": 1, "index": 19872, "values": [59617, 59618, 59619]}
+> {"sensor": 1, "index": 19873, "values": [59620, 59621, 59622]}
+> {"sensor": 1, "index": 19874, "values": [59623, 59624, 59625]}
+log: /var/lib/pipeline/evidence/failure_tests_20261016_011331.log

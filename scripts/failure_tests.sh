@@ -84,8 +84,11 @@ verify() {
     pipeline export --session "$s" --from device | sort > /tmp/dev.jsonl
     python3 /opt/pipeline/tools/check_export.py < /tmp/dev.jsonl
     pipeline export --session "$s" --from cloud | sort > /tmp/cloud.jsonl
-    if cmp -s /tmp/dev.jsonl /tmp/cloud.jsonl; then echo "cloud copy identical ($(wc -l < /tmp/cloud.jsonl) lines)"
-    else echo "CLOUD COPY DIFFERS"; diff /tmp/dev.jsonl /tmp/cloud.jsonl | head -5; fi
+    echo "cloud copy check:"; python3 /opt/pipeline/tools/check_export.py < /tmp/cloud.jsonl
+    # the session may still be recording, so the cloud can be slightly ahead of the device snapshot
+    missing=$(comm -23 /tmp/dev.jsonl /tmp/cloud.jsonl | wc -l)
+    extra=$(comm -13 /tmp/dev.jsonl /tmp/cloud.jsonl | wc -l)
+    echo "device lines missing from cloud: $missing; cloud lines newer than the device snapshot: $extra"
   done
 }
 

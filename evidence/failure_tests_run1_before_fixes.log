@@ -1,0 +1,93 @@
+== NETWORK CUT (60 s), traffic to the cloud dropped silently
+{"mode": "online", "mode_since": 1792092256.953567, "session": "502e8b47", "samples_saved": 33822, "samples_in_cloud": 33202, "backlog": 620, "losses": 2, "offline_results": 1}
+cut at 00:54:56
+switched to offline after: 24.413132063 s (limit 10)
+{"mode": "offline", "mode_since": 1792092320.6134655, "session": "502e8b47", "samples_saved": 101582, "samples_in_cloud": 33621, "backlog": 67961, "losses": 2, "offline_results": 82}
+restored at 00:56:21
+switched to online after: 3.200444432 s (limit 10)
+backlog cleared after: 404.984704607 s (limit 900 for a 2 h outage)
+{"mode": "online", "mode_since": 1792092383.9937387, "session": "502e8b47", "samples_saved": 428168, "samples_in_cloud": 427970, "backlog": 198, "losses": 2, "offline_results": 87}
+== PROCESS KILL (kill -9 collector and sync, 3 times)
+killed at 01:03:09
+active active 
+killed at 01:03:14
+active active 
+killed at 01:03:19
+active active 
+{"mode": "online", "mode_since": 1792092383.9937387, "session": "502e8b47", "samples_saved": 440281, "samples_in_cloud": 439880, "backlog": 401, "losses": 2, "offline_results": 87}
+== DISK FULL for 30 s
+disk filled at 01:03:24
+/dev/vda1        19G   19G 1020K 100% /
+space freed at 01:03:54
+Oct 16 01:03:10 lima-pi systemd[1]: Started pipeline-collect.service - Heartbeat pipeline collector (mock -> durable disk).
+Oct 16 01:03:15 lima-pi systemd[1]: Started pipeline-collect.service - Heartbeat pipeline collector (mock -> durable disk).
+Oct 16 01:03:20 lima-pi systemd[1]: Started pipeline-collect.service - Heartbeat pipeline collector (mock -> durable disk).
+{"mode": "online", "mode_since": 1792092383.9937387, "session": "502e8b47", "samples_saved": 476495, "samples_in_cloud": 476292, "backlog": 203, "losses": 2, "offline_results": 87}
+== CLOCK CHANGE (+3 h, then -1 day, then back)
+clock now Fri Oct 16 04:04:10 IST 2026
+clock now Thu Oct 15 01:04:30 IST 2026
+clock restored Fri Oct 16 01:04:55 IST 2026
+{"mode": "online", "mode_since": 1792092383.9937387, "session": "502e8b47", "samples_saved": 513481, "samples_in_cloud": 513074, "backlog": 407, "losses": 2, "offline_results": 87}
+== VERIFY: every session, device export vs ramp formula, cloud copy vs device copy
+waiting for the cloud to catch up: 35.843815700 s
+-- session d73e954a
+sensor 1: 11959 samples, 0 lost in 1 ranges, open loss from 11959, reasons ['mock_restarted: unread data of old session not delivered']
+sensor 2: 11969 samples, 0 lost in 1 ranges, open loss from 11969, reasons ['mock_restarted: unread data of old session not delivered']
+OK
+cloud copy identical (23930 lines)
+-- session 502e8b47
+sensor 1: 259772 samples, 0 lost in 0 ranges, reasons []
+sensor 2: 260082 samples, 0 lost in 0 ranges, reasons []
+OK
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/opt/pipeline/pipeline/cli.py", line 82, in <module>
+    main()
+    ~~~~^^
+  File "/opt/pipeline/pipeline/cli.py", line 61, in main
+    Cloud().export(sid, out)
+    ~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/opt/pipeline/pipeline/cloud.py", line 58, in export
+    res, _ = self._req("GET", "/export", {"session": sid, "sensor": sensor, "from": frm,
+             ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                          "to": frm + page}, timeout=60)
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/pipeline/pipeline/cloud.py", line 37, in _req
+    raise CloudError(f"HTTP {e.code}: {e.read()[:300]!r}") from None
+pipeline.cloud.CloudError: HTTP 500: b'{"error":"PostgresError: remaining connection slots are reserved for roles with the SUPERUSER attribute"}'
+Error in sys.excepthook:
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 238, in partial_apport_excepthook
+    return apport_excepthook(binary, exc_type, exc_obj, exc_tb)
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 122, in apport_excepthook
+    report["ExecutableTimestamp"] = str(int(os.stat(binary).st_mtime))
+                                            ~~~~~~~^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/opt/pipeline/-m'
+
+Original exception was:
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/opt/pipeline/pipeline/cli.py", line 82, in <module>
+    main()
+    ~~~~^^
+  File "/opt/pipeline/pipeline/cli.py", line 61, in main
+    Cloud().export(sid, out)
+    ~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/opt/pipeline/pipeline/cloud.py", line 58, in export
+    res, _ = self._req("GET", "/export", {"session": sid, "sensor": sensor, "from": frm,
+             ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                          "to": frm + page}, timeout=60)
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/pipeline/pipeline/cloud.py", line 37, in _req
+    raise CloudError(f"HTTP {e.code}: {e.read()[:300]!r}") from None
+pipeline.cloud.CloudError: HTTP 500: b'{"error":"PostgresError: remaining connection slots are reserved for roles with the SUPERUSER attribute"}'
+CLOUD COPY DIFFERS
+22310,22315d22309
+< {"sensor": 1, "index": 120074, "values": [360223, 360224, 360225]}
+< {"sensor": 1, "index": 120075, "values": [360226, 360227, 360228]}
+< {"sensor": 1, "index": 120076, "values": [360229, 360230, 360231]}
+< {"sensor": 1, "index": 120077, "values": [360232, 360233, 360234]}
+/Users/khushigupta/Desktop/Projects/never-lose-a-heartbeat/scripts/failure_tests.sh: line 93: syntax error near unexpected token `$'"\n    else echo "CLOUD''
+/Users/khushigupta/Desktop/Projects/never-lose-a-heartbeat/scripts/failure_tests.sh: line 93: `    else echo "CLOUD COPY DIFFERS"; diff /tmp/dev.jsonl /tmp/cloud.jsonl | head -5; fi'

@@ -1,0 +1,22 @@
+== POWER CUT
+{"mode": "online", "mode_since": 1792093171.2285764, "session": "502e8b47", "samples_saved": 859826, "samples_in_cloud": 859224, "backlog": 602, "losses": 2, "offline_results": 225}
+time="2026-10-16T01:12:08+05:30" level=info msg="Sending SIGKILL to the vz driver process 61742"
+time="2026-10-16T01:12:08+05:30" level=info msg="Sending SIGKILL to the host agent process 61742"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing *.pid *.sock *.tmp under `/Users/khushigupta/.lima/pi`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/boot-session.tmp`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/default_ep.sock`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/default_fd.sock`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/ha.pid`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/ha.sock`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/ssh.sock`"
+time="2026-10-16T01:12:08+05:30" level=info msg="Removing `/Users/khushigupta/.lima/pi/vz.pid`"
+power cut at 01:12:08
+powered on at 01:12:41
+{"mode": "online", "mode_since": 1792093171.2285764, "session": "8b904c32", "samples_saved": 882609, "samples_in_cloud": 882410, "backlog": 199, "losses": 4, "offline_results": 225}
+Oct 16 01:12:33 lima-pi python3[1026]: 01:12:33 [collector] session 502e8b47 s1: lost from 417944 (end unknown) - mock restarted
+Oct 16 01:12:33 lima-pi python3[1026]: 01:12:33 [collector] session 502e8b47 s2: lost from 417954 (end unknown) - mock restarted
+Oct 16 01:12:33 lima-pi python3[1026]: 01:12:33 [collector] new session 8b904c32
+== REBOOT
+back at 01:13:09
+{"mode": "online", "mode_since": 1792093171.2285764, "session": "7ab79e9b", "samples_saved": 896355, "samples_in_cloud": 895955, "backlog": 400, "losses": 6, "offline_results": 225}
+log: /Users/khushigupta/Desktop/Projects/never-lose-a-heartbeat/evidence/power_tests_20261016_011208.log
