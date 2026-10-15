@@ -2,7 +2,15 @@
 
 Record the screen with **QuickTime → File → New Screen Recording**, or press **Cmd+Shift+5**.
 
-Before you start, open **two Terminal windows** side by side.
+Before you start:
+
+1. The test mock was stopped overnight to save cloud storage. Start it again, then wait about 10 s:
+   ```bash
+   limactl shell pi -- sudo systemctl start biosignal-mock
+   ```
+   The old session will show one listed loss with `to_index: null`. That is correct: it is the "mock restart" case.
+
+2. Open **two Terminal windows** side by side.
 
 - **Left window, the live view.** Leave this running for the whole video:
   ```bash

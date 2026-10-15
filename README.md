@@ -20,7 +20,7 @@ A data pipeline for a Raspberry Pi-class bedside device. It saves every sensor s
 | 3. Survives crash, reboot and power cut | ✅ `kill -9` ×3, reboot, forced power-off. Power-cut loss bound **≤ 1 s** |
 | 4. Result in the cloud within 5 s | ✅ 4,000 of 4,000 windows. Median 0.46 s, p99 1.34 s, max 4.8 s |
 | 5. Mode switch ≤ 10 s, no loss or duplication | ✅ offline after 6.9 s, online after 3.0 s |
-| 6. Complete cloud copy after an outage | ✅ The cloud copy is identical for every closed session. A 2-min backlog cleared in 3.3 s. See the evidence folder for the 20-min outage. |
+| 6. Complete cloud copy after an outage | ✅ The cloud copy is identical for every closed session. A 20-minute outage (965k samples) caught up in 27 s, so a 2-hour outage takes about 3 min |
 | 7. Results follow section 3 | ✅ Python and TypeScript identical on the golden cases. 224 device-vs-cloud windows identical. Heart rate tracks 60/90/72 bpm |
 | 8. Resources | CPU 6.8% of one core, RSS 20.5 MB + 34.9 MB, 430 MB per hour written to disk, 40.9 MB per hour sent |
 

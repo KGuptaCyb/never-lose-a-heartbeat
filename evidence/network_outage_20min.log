@@ -1,0 +1,10 @@
+== NETWORK CUT (1200 s), traffic to the cloud dropped silently
+{"mode": "online", "mode_since": 1792093171.2285764, "session": "00242d55", "samples_saved": 7060263, "samples_in_cloud": 7060263, "backlog": 0, "losses": 8, "offline_results": 229}
+cut at 03:51:05
+switched to offline after: 6.891161144 s (limit 10)
+{"mode": "offline", "mode_since": 1792102872.0471094, "session": "00242d55", "samples_saved": 8026221, "samples_in_cloud": 7060671, "backlog": 965550, "losses": 8, "offline_results": 1435}
+restored at 04:11:12
+switched to online after: 2.421870562 s (limit 10)
+backlog cleared (< 1000 samples, i.e. only live data in flight) after: 27.342682493 s
+{"mode": "online", "mode_since": 1792104074.6713252, "session": "00242d55", "samples_saved": 8050441, "samples_in_cloud": 8050029, "backlog": 412, "losses": 8, "offline_results": 1443}
+log: /var/lib/pipeline/evidence/failure_tests_20261016_035104.log

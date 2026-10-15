@@ -1,0 +1,29 @@
+643840b8 device 3200000 lines, cloud 3200000 lines
+IDENTICAL
+{
+ "windows_online": 4980,
+ "windows_offline": 1217,
+ "cloud_latency_s": {
+  "median": 0.54,
+  "p95": 969.77,
+  "p99": 1164.62,
+  "max": 1209.67,
+  "within_5s_pct": 75.2
+ },
+ "heart_rate_counts": {
+  "60": 1638,
+  "62.6": 13,
+  "66.7": 13,
+  "69.2": 27,
+  "72": 1577,
+  "75": 14,
+  "77.2": 14,
+  "81.8": 14,
+  "83.1": 14,
+  "86.4": 14,
+  "90": 1638,
+  "None": 4
+ },
+ "windows_with_both_modes": 1217,
+ "online_offline_mismatches": []
+}

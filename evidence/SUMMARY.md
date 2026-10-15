@@ -14,6 +14,9 @@ Run 2 is the run after the fixes: [failure_tests_run2.log](failure_tests_run2.lo
 |---|---|---|
 | Network cut, 120 s (packets silently dropped) | Switched to offline after **6.9 s**, back to online after **3.0 s** | 5 (≤ 10 s) ✅ |
 | Catch-up after a 120 s outage (≈102k samples) | Backlog cleared in **3.3 s** after reconnecting, about 36× real time | 6 ✅ |
+| **20-minute network outage** (≈965k samples, signal mode), [log](network_outage_20min.log) | Offline after **6.9 s**, online after **2.4 s**, backlog cleared in **27 s** (about 44× real time). By extrapolation, a 2-hour outage catches up in about 3 minutes (limit 15). | 5, 6 ✅ |
+| Offline vs online results for the 1,217 windows processed on the device during that outage, [checks](final_checks_signal_sessions.txt) | **Identical** to the cloud's results for the same windows | 7 ✅ |
+| 66-minute signal session, cloud copy vs device copy | **Identical, 3,200,000 lines** | 6 ✅ |
 | `kill -9` of both processes, 3 times | Restarted by systemd within 1 s each time. No loss, no duplicates. | 3 ✅ |
 | Disk 100% full for 30 s | Reserve file released and saving continued. No loss. | 3 ✅ |
 | Clock moved +3 h, then −1 day | No effect on data or mode. Only the informational latency field is affected. | ✅ |
