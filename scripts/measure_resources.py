@@ -3,7 +3,8 @@
 
 Usage: sudo python3 scripts/measure_resources.py --seconds 3600 --iface eth0
 Reports average CPU (% of one core, summed over collector + sync), peak memory
-(max RSS of each process), MB written to disk (write_bytes from /proc/<pid>/io)
+(max RSS of each process), MB written to disk (sectors written to the block
+device, whole system, plus the per-process write_bytes counter for reference)
 and MB sent over the network (interface tx bytes; includes all traffic).
 """
 import argparse
@@ -43,6 +44,15 @@ def write_bytes(pid):
     return 0
 
 
+def disk_sectors(dev):
+    with open("/proc/diskstats") as f:
+        for line in f:
+            parts = line.split()
+            if parts[2] == dev:
+                return int(parts[9])  # sectors written (512 bytes)
+    return 0
+
+
 def net(iface):
     with open(f"/sys/class/net/{iface}/statistics/tx_bytes") as f:
         tx = int(f.read())
@@ -55,6 +65,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seconds", type=int, default=3600)
     ap.add_argument("--iface", default="eth0")
+    ap.add_argument("--disk", default="vda", help="block device holding the database")
     ap.add_argument("--out", default="evidence/resources.json")
     args = ap.parse_args()
     units = ["pipeline-collect.service", "pipeline-sync.service"]
@@ -63,6 +74,7 @@ def main():
     tot = {"cpu": 0, "wb": 0}
     peak = {u: 0 for u in units}
     tx0, rx0 = net(args.iface)
+    d0 = disk_sectors(args.disk)
     t0 = time.monotonic()
     samples = []
     while time.monotonic() - t0 < args.seconds:
@@ -84,6 +96,7 @@ def main():
         time.sleep(5)
     el = time.monotonic() - t0
     tx1, rx1 = net(args.iface)
+    d1 = disk_sectors(args.disk)
     with open("/proc/cpuinfo") as f:
         cores = sum(1 for l in f if l.startswith("processor"))
     with open("/proc/meminfo") as f:
@@ -93,7 +106,8 @@ def main():
         "seconds": round(el),
         "avg_cpu_percent_of_one_core": round(100 * tot["cpu"] / HZ / el, 2),
         "peak_rss_mb": {u: round(v / 1024, 1) for u, v in peak.items()},
-        "disk_written_mb": round(tot["wb"] / 1e6, 1),
+        "disk_written_mb_block_device": round((d1 - d0) * 512 / 1e6, 1),
+        "disk_written_mb_proc_io_counter": round(tot["wb"] / 1e6, 1),
         "network_sent_mb": round((tx1 - tx0) / 1e6, 1),
         "network_received_mb": round((rx1 - rx0) / 1e6, 1),
     }

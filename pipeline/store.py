@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS progress (
   sensor     INTEGER NOT NULL,
   next_index INTEGER NOT NULL,
   ended      INTEGER NOT NULL DEFAULT 0,
+  cloud_next INTEGER NOT NULL DEFAULT 0,   -- everything below this index is acknowledged by the cloud
   PRIMARY KEY (session_id, sensor)
 );
 CREATE TABLE IF NOT EXISTS chunks (
@@ -32,7 +33,6 @@ CREATE TABLE IF NOT EXISTS chunks (
   uploaded    INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (session_id, sensor, first_index)
 );
-CREATE INDEX IF NOT EXISTS chunks_pending ON chunks(uploaded, session_id, sensor, first_index);
 CREATE TABLE IF NOT EXISTS losses (
   session_id  TEXT NOT NULL,
   sensor      INTEGER NOT NULL,
@@ -63,7 +63,27 @@ def connect(path):
     db.execute("PRAGMA synchronous=FULL")
     db.execute("PRAGMA busy_timeout=30000")
     db.executescript(SCHEMA)
+    _migrate(db)
     return db
+
+
+def _migrate(db):
+    """Databases from before the upload watermark: derive cloud_next from the old per-row flags."""
+    cols = [r[1] for r in db.execute("PRAGMA table_info(progress)")]
+    if "cloud_next" in cols:
+        return
+    db.execute("BEGIN IMMEDIATE")
+    db.execute("ALTER TABLE progress ADD COLUMN cloud_next INTEGER NOT NULL DEFAULT 0")
+    for sid, sensor, nxt in db.execute("SELECT session_id,sensor,next_index FROM progress").fetchall():
+        a = db.execute("SELECT MIN(first_index) FROM chunks WHERE uploaded=0 AND session_id=? AND sensor=?",
+                       (sid, sensor)).fetchone()[0]
+        b = db.execute("SELECT MIN(from_index) FROM losses WHERE uploaded=0 AND session_id=? AND sensor=?",
+                       (sid, sensor)).fetchone()[0]
+        cands = [x for x in (a, b) if x is not None]
+        db.execute("UPDATE progress SET cloud_next=? WHERE session_id=? AND sensor=?",
+                   (min(cands) if cands else nxt, sid, sensor))
+    db.execute("DROP INDEX IF EXISTS chunks_pending")
+    db.execute("COMMIT")
 
 
 class Store:
@@ -99,9 +119,9 @@ class Store:
 
     def progress(self, sid):
         out = {}
-        for sensor, nxt, ended in self.db.execute(
-                "SELECT sensor,next_index,ended FROM progress WHERE session_id=?", (sid,)):
-            out[sensor] = {"next": nxt, "ended": bool(ended)}
+        for sensor, nxt, ended, cloud in self.db.execute(
+                "SELECT sensor,next_index,ended,cloud_next FROM progress WHERE session_id=?", (sid,)):
+            out[sensor] = {"next": nxt, "ended": bool(ended), "cloud": cloud}
         return out
 
     # ---- writes (call inside a transaction) -------------------------------
@@ -140,8 +160,9 @@ class Store:
         return self.db.execute(q + (" WHERE session_id=?" if sid else ""), (sid,) if sid else ()).fetchone()[0]
 
     def samples_uploaded(self, sid=None):
-        q = "SELECT COALESCE(SUM(count),0) FROM chunks WHERE uploaded=1"
-        return self.db.execute(q + (" AND session_id=?" if sid else ""), (sid,) if sid else ()).fetchone()[0]
+        q = ("SELECT COALESCE(SUM(c.count),0) FROM chunks c JOIN progress p "
+             "ON p.session_id=c.session_id AND p.sensor=c.sensor WHERE c.first_index < p.cloud_next")
+        return self.db.execute(q + (" AND c.session_id=?" if sid else ""), (sid,) if sid else ()).fetchone()[0]
 
     def load_range(self, sid, sensor, lo, hi):
         """Samples with lo <= index < hi as {index: values}."""

@@ -16,7 +16,7 @@ import time
 from .protocol import CorruptReply, parse_reply
 from .store import Store
 
-POLL_INTERVAL = 0.25      # seconds between read cycles (per sensor)
+POLL_INTERVAL = 0.5       # seconds between read cycles; one fsynced commit per cycle
 REPLY_TIMEOUT = 3.0       # mock "stops answering"
 GAP_CONFIRMATIONS = 2     # unexplained gap must be seen this many times before it is a loss
 RESERVE_BYTES = 32 * 1024 * 1024

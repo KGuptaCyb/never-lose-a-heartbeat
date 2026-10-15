@@ -7,7 +7,7 @@ Mode rules (each switch well inside 10 s):
             health check (2.5 s): worst case about 7 s
   offline -> online  after 2 consecutive successful health checks (every 2 s)
 
-Exactly-once to the cloud: rows are marked uploaded only after the cloud
+Exactly-once to the cloud: the per-sensor watermark advances only after the cloud
 acknowledges them; the cloud inserts with ON CONFLICT DO NOTHING, so a retry
 after a lost acknowledgement cannot create a duplicate.
 """
@@ -32,12 +32,7 @@ def log(*a):
 
 def acked_through(store, sid, sensor):
     """Every index below this is in the cloud (or recorded lost there)."""
-    a = store.db.execute("SELECT MIN(first_index) FROM chunks WHERE uploaded=0 AND session_id=? AND sensor=?",
-                         (sid, sensor)).fetchone()[0]
-    b = store.db.execute("SELECT MIN(from_index) FROM losses WHERE uploaded=0 AND session_id=? AND sensor=?",
-                         (sid, sensor)).fetchone()[0]
-    cands = [x for x in (a, b) if x is not None]
-    return min(cands) if cands else store.progress(sid)[sensor]["next"]
+    return store.progress(sid)[sensor]["cloud"]
 
 
 def status(store):
@@ -62,6 +57,8 @@ class Sync:
         self.ready_since = {}
         self.last_health = 0.0
         self.net_bytes = 0
+        self.persisted_at = {}
+        self.states = {}
 
     # ---- mode --------------------------------------------------------------
     def set_mode(self, mode):
@@ -86,8 +83,9 @@ class Sync:
     # ---- upload --------------------------------------------------------------
     def pending_session(self):
         row = self.store.db.execute(
-            "SELECT s.session_id FROM sessions s WHERE EXISTS (SELECT 1 FROM chunks c WHERE c.session_id=s.session_id AND c.uploaded=0)"
-            " OR EXISTS (SELECT 1 FROM losses l WHERE l.session_id=s.session_id AND l.uploaded=0)"
+            "SELECT p.session_id FROM progress p JOIN sessions s ON s.session_id=p.session_id WHERE "
+            "EXISTS (SELECT 1 FROM chunks c WHERE c.session_id=p.session_id AND c.sensor=p.sensor AND c.first_index>=p.cloud_next)"
+            " OR EXISTS (SELECT 1 FROM losses l WHERE l.session_id=p.session_id AND l.sensor=p.sensor AND l.from_index>=p.cloud_next)"
             " ORDER BY s.seq LIMIT 1").fetchone()
         if row:
             return row[0]
@@ -103,30 +101,36 @@ class Sync:
                                      (sid, s)).fetchone() is not None
 
     def build_batch(self, sid):
-        items, marks = [], {"chunks": [], "losses": [], "ends": []}
+        """Pending chunks and losses per sensor, in index order, starting at the
+        cloud watermark. Together they are contiguous, so the new watermark after
+        an acknowledgement is simply the end of the last item."""
+        items, marks = [], {"next": {}, "ends": []}
+        prog = self.store.progress(sid)
         for s in (1, 2):
-            rows = self.store.db.execute(
-                "SELECT first_index,count,data,rx_time FROM chunks WHERE uploaded=0 AND session_id=? AND sensor=? "
-                "ORDER BY first_index", (sid, s))
-            total, cutoff = 0, None
-            for first, count, data, rx in rows:
-                if total >= MAX_SAMPLES_PER_SENSOR:
-                    cutoff = first
-                    break
-                items.append({"type": "chunk", "sensor": s, "first_index": first,
-                              "data": json.loads(data), "rx_time": rx})
-                marks["chunks"].append((s, first))
-                total += count
-            for frm, to, reason in self.store.db.execute(
-                    "SELECT from_index,to_index,reason FROM losses WHERE uploaded=0 AND session_id=? AND sensor=? "
-                    "ORDER BY from_index", (sid, s)):
-                if cutoff is not None and frm >= cutoff:
-                    break
-                items.append({"type": "loss", "sensor": s, "from_index": frm, "to_index": to, "reason": reason})
-                marks["losses"].append((s, frm))
-            p = self.store.progress(sid)[s]
-            if cutoff is None and p["ended"] and not self._ended_by_loss(sid, s) \
-                    and not self.store.get_kv(f"end_sent:{sid}:{s}"):
+            p = prog[s]
+            recs = [(f, "chunk", c, d, rx) for f, c, d, rx in self.store.db.execute(
+                "SELECT first_index,count,data,rx_time FROM chunks WHERE session_id=? AND sensor=? AND first_index>=? "
+                "ORDER BY first_index LIMIT 400", (sid, s, p["cloud"]))]
+            recs += [(f, "loss", t, r, None) for f, t, r in self.store.db.execute(
+                "SELECT from_index,to_index,reason FROM losses WHERE session_id=? AND sensor=? AND from_index>=? "
+                "ORDER BY from_index", (sid, s, p["cloud"]))]
+            recs.sort(key=lambda r: r[0])
+            total, end, cut = 0, p["cloud"], False
+            for first, kind, a, b, rx in recs:
+                if first != end or total >= MAX_SAMPLES_PER_SENSOR:
+                    cut = True
+                    break  # keep each batch contiguous from the watermark
+                if kind == "chunk":
+                    items.append({"type": "chunk", "sensor": s, "first_index": first, "data": json.loads(b), "rx_time": rx})
+                    total += a
+                    end = first + a
+                else:
+                    items.append({"type": "loss", "sensor": s, "from_index": first, "to_index": a, "reason": b})
+                    end = (a + 1) if a is not None else first + 1
+            if end != p["cloud"]:
+                marks["next"][s] = end
+            if not cut and p["ended"] and not self._ended_by_loss(sid, s) \
+                    and not self.store.get_kv(f"end_sent:{sid}:{s}") and end >= p["next"]:
                 items.append({"type": "end", "sensor": s, "at": p["next"]})
                 marks["ends"].append(s)
         return items, marks
@@ -145,10 +149,8 @@ class Sync:
             log(f"slow ingest: {dt:.1f}s for {len(items)} items")
         self.net_bytes += nbytes
         with self.store.tx() as db:
-            db.executemany("UPDATE chunks SET uploaded=1 WHERE session_id=? AND sensor=? AND first_index=?",
-                           [(sid, s, f) for s, f in marks["chunks"]])
-            db.executemany("UPDATE losses SET uploaded=1 WHERE session_id=? AND sensor=? AND from_index=?",
-                           [(sid, s, f) for s, f in marks["losses"]])
+            for s, end in marks["next"].items():
+                db.execute("UPDATE progress SET cloud_next=? WHERE session_id=? AND sensor=?", (end, sid, s))
             for s in marks["ends"]:
                 self.store.set_kv(f"end_sent:{sid}:{s}", True)
         return True
@@ -157,7 +159,9 @@ class Sync:
     def process(self):
         for sid in self.store.sessions():
             key = f"proc:{sid}"
-            state = self.store.get_kv(key) or P.new_state()
+            if sid not in self.states:
+                self.states[sid] = self.store.get_kv(key) or P.new_state()
+            state = self.states[sid]
             if state.get("done"):
                 continue
             prog = self.store.progress(sid)
@@ -183,7 +187,11 @@ class Sync:
             if ended[1] and ended[2] and not P.ready(state["next_window"], known, ended):
                 state["done"] = True
                 changed = True
-            if changed:
+            # persist processing state with new results, or every 10 s; after a crash the
+            # few windows since then are simply recomputed (results are deterministic)
+            last = self.persisted_at.get(sid, 0)
+            if new_results or (changed and (state.get("done") or time.monotonic() - last > 10)):
+                self.persisted_at[sid] = time.monotonic()
                 with self.store.tx() as db:
                     db.executemany("INSERT OR IGNORE INTO results VALUES(?,?,?,?)", new_results)
                     self.store.set_kv(key, state)

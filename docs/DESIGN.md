@@ -35,7 +35,7 @@ There are two processes, each a systemd service with `Restart=always`:
 | Corrupt reply | The CRC32 is checked over the raw `data` text exactly as sent. A reply that fails is discarded and the same `from_index` is requested again. |
 | Duplicate reply or overlap | Anything below `next_index` is dropped. |
 | Mock silent | After 3 s the collector reconnects and resumes from `next_index`. |
-| Sensor dropout or buffer overflow | Ranges in the mock's `lost` field are stored with the mock's own reason. An unexplained gap is recorded as `not_delivered_by_mock` only after it is seen twice. |
+| Sensor dropout / buffer overflow | Ranges in the mock's `lost` are stored with the mock's reason. An unexplained gap becomes a `not_delivered_by_mock` loss only after **two separate explicit requests** for that index were answered past it (a duplicated reply counts once). After 3 unusable replies in a row the collector sends a plain read to resync with whatever session the mock is in. |
 | Mock restart | A new `session_id` closes the old session. Its unread tail is recorded as lost with `to_index: null`. |
 | Process kill | systemd restarts the process within 1 s, and it resumes from `next_index`. The mock still holds the last 10 s, so nothing is lost. |
 | Network cut | 2 failed calls switch the device to offline mode (≈2–7 s). Offline windows are processed on the device. 2 successful health checks switch back to online mode (≈2–4 s). |
