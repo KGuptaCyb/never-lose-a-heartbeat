@@ -1,6 +1,7 @@
 """Minimal HTTP client for the cloud function (stdlib only)."""
 import gzip
 import json
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,6 +20,28 @@ class Cloud:
             raise CloudError("CLOUD_URL not configured")
 
     def _req(self, method, path, params=None, body=None, timeout=5.0):
+        """Like _do, but with a hard overall deadline. urllib's timeout is per
+        socket operation and per resolved address, so a silently dropped network
+        could otherwise block for several times `timeout`. An abandoned call may
+        still complete later; that is safe because ingest is idempotent."""
+        box = {}
+
+        def run():
+            try:
+                box["ok"] = self._do(method, path, params, body, timeout)
+            except Exception as e:  # noqa: BLE001 - re-raised below
+                box["err"] = e
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        t.join(timeout)
+        if "ok" in box:
+            return box["ok"]
+        if "err" in box:
+            raise box["err"]
+        raise CloudError(f"no answer within {timeout:.1f}s")
+
+    def _do(self, method, path, params, body, timeout):
         url = self.url + path + ("?" + urllib.parse.urlencode(params) if params else "")
         headers = {"x-device-token": config.DEVICE_TOKEN}
         if config.CLOUD_ANON_KEY:

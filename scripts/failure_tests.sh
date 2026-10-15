@@ -20,6 +20,14 @@ wait_for() {  # wait_for <field> <value> <timeout>  -> prints seconds waited
   done
   echo "$(now) - $t0" | bc
 }
+wait_below() {  # wait_below <field> <max> <timeout>: live data keeps a small backlog in flight
+  local t0; t0=$(now)
+  while [ "$(field "$1")" -gt "$2" ]; do
+    sleep 0.25
+    if (( $(echo "$(now) - $t0 > $3" | bc) )); then echo "TIMEOUT"; return 1; fi
+  done
+  echo "$(now) - $t0" | bc
+}
 block()   { iptables -I OUTPUT -p tcp --dport 443 -j DROP; }
 unblock() { iptables -D OUTPUT -p tcp --dport 443 -j DROP; }
 
@@ -32,7 +40,7 @@ test_net() {
   pipeline status
   unblock; echo "restored at $(date +%T)"
   echo "switched to online after: $(wait_for mode online 30) s (limit 10)"
-  echo "backlog cleared after: $(wait_for backlog 0 1800) s (limit 900 for a 2 h outage)"
+  echo "backlog cleared (< 1000 samples, i.e. only live data in flight) after: $(wait_below backlog 1000 1800) s"
   pipeline status
 }
 
@@ -70,7 +78,7 @@ test_clock() {
 
 verify() {
   echo "== VERIFY: every session, device export vs ramp formula, cloud copy vs device copy"
-  echo "waiting for the cloud to catch up: $(wait_for backlog 0 1800) s"
+  echo "waiting for the cloud to catch up: $(wait_below backlog 1000 1800) s"
   for s in $(pipeline sessions); do
     echo "-- session $s"
     pipeline export --session "$s" --from device | sort > /tmp/dev.jsonl

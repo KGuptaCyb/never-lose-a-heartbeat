@@ -8,7 +8,10 @@
 import postgres from "npm:postgres@3.4.5";
 import { type Loader, newState, processWindow, ready, type Samples, type State, W } from "./processing.ts";
 
-const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false, idle_timeout: 3, connect_timeout: 10 });
+// One short-lived connection per request: many function instances each holding
+// idle connections exhausted the free tier's connection slots.
+type Sql = ReturnType<typeof postgres>;
+const connect = (): Sql => postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false, connect_timeout: 10 });
 const TOKEN = Deno.env.get("DEVICE_TOKEN") ?? "";
 
 const SCHEMA = `
@@ -33,8 +36,19 @@ ALTER TABLE hb2_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hb2_proc_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hb2_results ENABLE ROW LEVEL SECURITY;`;
 
-let schemaReady: Promise<unknown> | null = null;
-const ensureSchema = () => (schemaReady ??= sql.unsafe(SCHEMA).catch((e) => { schemaReady = null; throw e; }));
+let schemaReady = false;
+const ensureSchema = async (sql: Sql) => {
+  if (schemaReady) return;
+  const [r] = await sql`SELECT to_regclass('hb2_results') IS NOT NULL AS ok`;
+  if (!r.ok) {
+    // first use only; the lock keeps concurrent cold starts from deadlocking on DDL
+    await sql.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(4242)`;
+      await tx.unsafe(SCHEMA);
+    });
+  }
+  schemaReady = true;
+};
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -52,7 +66,7 @@ async function readBody(req: Request): Promise<{ session_id: string; items: Item
   return await req.json();
 }
 
-async function ingest(req: Request) {
+async function ingest(req: Request, sql: Sql) {
   const { session_id: sid, items } = await readBody(req);
   const t0 = performance.now();
   const results = await sql.begin(async (tx) => {
@@ -145,12 +159,13 @@ async function processReady(tx: any, sid: string, known: Record<number, number>,
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname.replace(/^.*\/pipeline/, "") || "/";
+  if (path === "/health") return json({ ok: true, t: Date.now() / 1000 });
+  if (!TOKEN || req.headers.get("x-device-token") !== TOKEN) return json({ error: "unauthorized" }, 401);
+  const sql = connect();
   try {
-    if (path === "/health") return json({ ok: true, t: Date.now() / 1000 });
-    if (!TOKEN || req.headers.get("x-device-token") !== TOKEN) return json({ error: "unauthorized" }, 401);
-    await ensureSchema();
+    await ensureSchema(sql);
     const sid = url.searchParams.get("session") ?? "";
-    if (path === "/ingest" && req.method === "POST") return await ingest(req);
+    if (path === "/ingest" && req.method === "POST") return await ingest(req, sql);
     if (path === "/status") {
       const [c] = await sql`SELECT COALESCE(SUM(count),0)::bigint AS n FROM hb2_chunks WHERE session_id = ${sid}`;
       const p = await sql`SELECT sensor, known_next, ended FROM hb2_progress WHERE session_id = ${sid}`;
@@ -174,5 +189,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error(e);
     return json({ error: String(e) }, 500);
+  } finally {
+    await sql.end({ timeout: 2 });
   }
 });

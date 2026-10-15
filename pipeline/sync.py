@@ -3,7 +3,8 @@
 Runs as its own process so the collector never waits on the network.
 
 Mode rules (each switch well inside 10 s):
-  online  -> offline after 2 consecutive failed cloud calls (timeouts <= 6 s, calls 0.5 s apart)
+  online  -> offline after a failed upload (hard deadline 4 s) confirmed by a failed
+            health check (2.5 s): worst case about 7 s
   offline -> online  after 2 consecutive successful health checks (every 2 s)
 
 Exactly-once to the cloud: rows are marked uploaded only after the cloud
@@ -138,7 +139,7 @@ class Sync:
         if not items:
             return False
         t0 = time.monotonic()
-        _, nbytes = self.cloud.ingest(sid, items, timeout=6.0)
+        _, nbytes = self.cloud.ingest(sid, items, timeout=4.0)
         dt = time.monotonic() - t0
         if dt > 2:
             log(f"slow ingest: {dt:.1f}s for {len(items)} items")
@@ -193,7 +194,15 @@ class Sync:
         while True:
             t0 = time.monotonic()
             try:
-                if self.mode == "online":
+                if self.mode == "online" and self.fails:
+                    # one call already failed: confirm quickly before sending more data
+                    try:
+                        self.cloud.health(timeout=2.5)
+                        self.record(True)
+                    except CloudError as e:
+                        log("health check failed:", e)
+                        self.record(False)
+                elif self.mode == "online":
                     try:
                         sent = self.upload_once()
                         if not sent and t0 - self.last_health > 2:
