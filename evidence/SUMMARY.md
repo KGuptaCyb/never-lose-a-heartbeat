@@ -35,3 +35,10 @@ RESOURCES_PLACEHOLDER
 ## Online result latency, same hour
 
 LATENCY_PLACEHOLDER
+
+## Extra: disk full for longer than the mock's buffer, with no reserve left
+
+This test ran on macOS using an 8 MB RAM disk.
+- The disk was kept full for 25 s, which is longer than the mock's 10 s buffer, so samples overflowed.
+- The overflow was recorded as **lost, with the reason `buffer_overflow (device disk was full)`**: 6,054 samples per sensor, as one range.
+- There were no silent gaps and no wrong values (`check_export.py`: OK).

@@ -166,7 +166,9 @@ class Collector:
                 self.sid = self.store.latest_session()
                 if self.release_reserve():
                     continue
-                log("DISK FULL: cannot save; data will be re-requested and any overflow recorded as lost")
+                if time.monotonic() - getattr(self, "_last_full_log", 0) > 10:
+                    self._last_full_log = time.monotonic()
+                    log("DISK FULL: cannot save; data will be re-requested and any overflow recorded as lost")
                 return
 
     def apply(self, msg):
