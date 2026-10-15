@@ -181,6 +181,18 @@ Deno.serve(async (req) => {
       const [p] = await sql`SELECT known_next FROM hb2_progress WHERE session_id = ${sid} AND sensor = ${sensor}`;
       return json({ chunks: chunks.map((c) => [Number(c.first_index), c.data]), losses, known_next: p ? Number(p.known_next) : 0 });
     }
+    if (path === "/admin/size") {
+      const [d] = await sql`SELECT pg_database_size(current_database())::bigint AS bytes`;
+      const t = await sql`SELECT session_id, SUM(count)::bigint AS samples FROM hb2_chunks GROUP BY 1 ORDER BY 2 DESC`;
+      return json({ db_mb: Math.round(Number(d.bytes) / 1e6), sessions: t });
+    }
+    if (path === "/admin/delete" && req.method === "POST") {
+      // housekeeping for test sessions (free tier storage is 500 MB)
+      for (const tbl of ["hb2_chunks", "hb2_losses", "hb2_progress", "hb2_proc_state", "hb2_results"]) {
+        await sql`DELETE FROM ${sql(tbl)} WHERE session_id = ${sid}`;
+      }
+      return json({ deleted: sid });
+    }
     if (path === "/results") {
       const r = await sql`SELECT payload, created_at FROM hb2_results WHERE session_id = ${sid} ORDER BY "window"`;
       return json(r.map((x) => ({ ...JSON.parse(x.payload), processed_at: new Date(x.created_at).getTime() / 1000 })));
