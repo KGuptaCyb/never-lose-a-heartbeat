@@ -12,6 +12,20 @@ A data pipeline for a Raspberry Pi-class bedside device. It saves every sensor s
 >
 > To use the real mock, set `MOCK_CMD` (or run it yourself on port 7100). No code changes are needed. `tools/check_export.py` is a stand-in for `check_ground_truth` that works for ramp mode.
 
+## Results at a glance
+
+| Criterion | Measured on ARM64, 4 vCPU, 2 GB |
+|---|---|
+| 1–2. Every sample stored exactly once, or listed as lost | ✅ About 930k ramp samples checked against the formula: 0 duplicates, 0 wrong values, 0 silent gaps |
+| 3. Survives crash, reboot and power cut | ✅ `kill -9` ×3, reboot, forced power-off. Power-cut loss bound **≤ 1 s** |
+| 4. Result in the cloud within 5 s | ✅ 4,000 of 4,000 windows. Median 0.46 s, p99 1.34 s, max 4.8 s |
+| 5. Mode switch ≤ 10 s, no loss or duplication | ✅ offline after 6.9 s, online after 3.0 s |
+| 6. Complete cloud copy after an outage | ✅ The cloud copy is identical for every closed session. A 2-min backlog cleared in 3.3 s. See the evidence folder for the 20-min outage. |
+| 7. Results follow section 3 | ✅ Python and TypeScript identical on the golden cases. 224 device-vs-cloud windows identical. Heart rate tracks 60/90/72 bpm |
+| 8. Resources | CPU 6.8% of one core, RSS 20.5 MB + 34.9 MB, 430 MB per hour written to disk, 40.9 MB per hour sent |
+
+Details are in [evidence/SUMMARY.md](evidence/SUMMARY.md).
+
 ## Layout
 
 | Path | What |

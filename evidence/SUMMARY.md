@@ -31,7 +31,18 @@ Run 1 ([failure_tests_run1_before_fixes.log](failure_tests_run1_before_fixes.log
 
 ## Resources over 1 hour, online mode, signal mode
 
-RESOURCES_PLACEHOLDER
+Measured with [scripts/measure_resources.py](../scripts/measure_resources.py) on the ARM64 VM (4 vCPU, 2 GB). The run was a 1-hour live signal-mode session in online mode. Full data: [resources_1h_online.json](resources_1h_online.json).
+
+| Metric | Value |
+|---|---|
+| Average CPU (collector + sync) | **6.8% of one core** (1.7% of the 4-core budget) |
+| Peak memory (RSS) | **collector 20.5 MB, sync 34.9 MB** |
+| Disk written | **430 MB per hour**. This is sectors written to the block device for the whole system, including logs. The data itself is about 55 MB per hour as JSON text. The rest is SQLite's write-ahead log, checkpoints and fsync, which are the cost of ≤1 s loss on a power cut. |
+| Network sent | **40.9 MB per hour** (gzip JSON). Network received: 50.2 MB per hour. |
+
+Two notes on these figures:
+- **The first 1-hour run** ([resources_1h_run1_before_write_fixes.json](resources_1h_run1_before_write_fixes.json)) showed CPU at 9.3% and roughly 950 MB written per hour at the block device. I reduced the writes in three ways: one upload watermark per sensor instead of a flag on every chunk row, commits every 0.5 s instead of every 0.25 s, and saving the processing state every 10 s.
+- **The per-process `write_bytes` counter in `/proc/<pid>/io`** reported much more (about 9.8 GB per hour). That counter disagrees with both a syscall trace (`strace`: about 75 KB/s of `pwrite`) and the block device itself. It is kept in the JSON for transparency, but the block-device number is the real one.
 
 ## Online result latency, same hour
 
