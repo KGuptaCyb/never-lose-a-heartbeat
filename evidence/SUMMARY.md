@@ -34,7 +34,17 @@ RESOURCES_PLACEHOLDER
 
 ## Online result latency, same hour
 
-LATENCY_PLACEHOLDER
+This was a signal-mode session of 66 minutes (4,000 windows), session `643840b8`. The full report is in [latency_signal_session.json](latency_signal_session.json).
+
+Latency here is measured from the moment the device received the last sample a window depends on, to the moment the cloud wrote that window's result.
+
+| Metric | Value |
+|---|---|
+| Windows with an online (cloud) result | 4,000 of 4,000 |
+| Latency, median / p95 / p99 / max | **0.46 s / 0.79 s / 1.34 s / 4.8 s** |
+| Windows within 5 s | **100%** (criterion 4 ✅) |
+| Complete windows | 4,000 of 4,000 |
+| Heart rate | 60 bpm (minutes 0–2), 90 (2–4), 72 (4–6), repeating, as the mock specifies. Values in between (62.6–86.4) appear only in the windows whose 5 s span straddles a rate change. `null` only for windows 0–3. |
 
 ## Extra: disk full for longer than the mock's buffer, with no reserve left
 

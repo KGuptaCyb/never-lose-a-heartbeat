@@ -39,7 +39,7 @@ There are two processes, each a systemd service with `Restart=always`:
 | Mock restart | A new `session_id` closes the old session. Its unread tail is recorded as lost with `to_index: null`. |
 | Process kill | systemd restarts the process within 1 s, and it resumes from `next_index`. The mock still holds the last 10 s, so nothing is lost. |
 | Network cut | 2 failed calls switch the device to offline mode (≈2–7 s). Offline windows are processed on the device. 2 successful health checks switch back to online mode (≈2–4 s). |
-| Catch-up | The upload backlog is sent oldest first, in batches of up to 30 s of data per sensor, gzip-compressed. Data is marked uploaded only after the cloud acknowledges it, and a retry is harmless. |
+| Catch-up | The upload backlog is sent oldest first, in batches of up to 30 s of data per sensor, gzip-compressed. A per-sensor watermark (`cloud_next`) advances only after the cloud acknowledges the batch (one small row update, not a flag per chunk, to keep disk writes low), and a retry is harmless. |
 | Disk full | A 32 MB reserve file is released first. If the disk is still full, data is not acknowledged. The mock then reports a buffer overflow, and that loss is recorded with the reason "(device disk was full)". |
 | Clock change | No logic uses the wall clock. All timers use monotonic time, and data is ordered by sample index. Wall time is stored only to report latency. |
 
@@ -62,7 +62,7 @@ There are two processes, each a systemd service with `Restart=always`:
 
 What can be lost is limited to:
 - the reply in flight;
-- data the mock had buffered but not yet sent. The collector polls every 0.25 s, so this is about 0.25–0.5 s in practice.
+- data the mock had buffered but not yet sent. The collector polls every 0.5 s, so this is about 0.5–1 s in practice.
 
 Because the mock runs on the same board, it also loses power and restarts with a new session. The collector records the old session's unread tail as `to_index: null`, so the loss is listed, never silent.
 
