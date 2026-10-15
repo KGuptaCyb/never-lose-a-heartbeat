@@ -1,0 +1,14 @@
+[Unit]
+Description=Heartbeat pipeline sync (cloud upload, mode switching, offline processing)
+After=network-online.target pipeline-collect.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -m pipeline.cli sync
+WorkingDirectory=/opt/pipeline
+EnvironmentFile=/etc/pipeline.env
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

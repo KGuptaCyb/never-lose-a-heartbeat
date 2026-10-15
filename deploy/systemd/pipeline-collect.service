@@ -1,0 +1,16 @@
+[Unit]
+Description=Heartbeat pipeline collector (mock -> durable disk)
+After=local-fs.target biosignal-mock.service
+
+[Service]
+ExecStart=/usr/bin/python3 -m pipeline.cli collect
+WorkingDirectory=/opt/pipeline
+EnvironmentFile=/etc/pipeline.env
+Restart=always
+RestartSec=1
+# the collector matters more than anything else on the box
+Nice=-5
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target

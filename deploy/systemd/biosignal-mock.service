@@ -1,0 +1,12 @@
+[Unit]
+Description=biosignal mock (test setup only; MOCK_CMD in /etc/pipeline.env)
+After=local-fs.target
+
+[Service]
+EnvironmentFile=/etc/pipeline.env
+ExecStart=/bin/sh -c 'exec $MOCK_CMD'
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
