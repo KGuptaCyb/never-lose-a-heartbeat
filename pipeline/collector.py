@@ -73,10 +73,12 @@ class Collector:
         self.host, self.port = host, port
         self.conn = None
         self.sid = store.latest_session()
-        self.gap_seen = {}           # sensor -> (next_index, times)
+        self.gap_seen = {}           # (sensor, next_index) -> request ids that confirmed the gap
         self.disk_full_since = None  # monotonic time the disk filled
         self.reserve = os.path.join(os.path.dirname(os.path.abspath(store.path)), "reserve.bin")
         self.stats = {"replies": 0, "corrupt": 0, "dups": 0}
+        self.bad = {1: 0, 2: 0}      # consecutive unusable replies per sensor
+        self.req_seq = 0
 
     # ---- disk reserve ------------------------------------------------------
     def ensure_reserve(self):
@@ -125,17 +127,24 @@ class Collector:
         sensors = self.wanted_sensors()
         for sensor in sensors:
             req = {"cmd": "read", "sensor": sensor}
-            if self.sid is not None:
+            # normally ask for exactly the next index we need; after repeated unusable
+            # replies (e.g. an error because the mock restarted and that index no longer
+            # exists) send a plain read to resync with whatever session the mock is in
+            if self.sid is not None and self.bad[sensor] < 3:
                 req["from_index"] = self.store.progress(self.sid)[sensor]["next"]
+            self.req_seq += 1
             self.conn.send(req)
             lines = self.conn.read_lines(REPLY_TIMEOUT)
             if not lines:
                 raise ConnectionError("mock did not answer within %.0fs" % REPLY_TIMEOUT)
             for line in lines:
                 try:
-                    replies.append(parse_reply(line))
+                    msg = parse_reply(line)
+                    replies.append((msg, self.req_seq, req.get("from_index"), sensor))
+                    self.bad[msg["sensor"]] = 0
                 except CorruptReply as e:
                     self.stats["corrupt"] += 1
+                    self.bad[sensor] += 1
                     log("discarding corrupt reply:", e)
         if replies:
             self.save(replies)
@@ -152,8 +161,8 @@ class Collector:
         while True:
             try:
                 with self.store.tx():
-                    for msg in replies:
-                        self.apply(msg)
+                    for msg, seq, asked_from, asked_sensor in replies:
+                        self.apply(msg, seq, asked_from if asked_sensor == msg["sensor"] else None)
                 if self.disk_full_since is not None:
                     log("disk writable again")
                     self.disk_full_since = None
@@ -171,7 +180,7 @@ class Collector:
                     log("DISK FULL: cannot save; data will be re-requested and any overflow recorded as lost")
                 return
 
-    def apply(self, msg):
+    def apply(self, msg, req_seq=None, asked_from=None):
         sid = msg["session_id"]
         if sid != self.sid:
             known = self.store.db.execute("SELECT 1 FROM sessions WHERE session_id=?", (sid,)).fetchone()
@@ -200,10 +209,14 @@ class Collector:
                     self.stats["dups"] += 1
                 continue
             if start > nxt:
+                # An unexplained gap is evidence only if we explicitly asked for nxt and
+                # the mock still answered past it. Count each request once (a duplicated
+                # reply is the same evidence), and require GAP_CONFIRMATIONS requests.
                 key = (sensor, nxt)
-                times = self.gap_seen.get(key, 0) + 1
-                self.gap_seen[key] = times
-                if times < GAP_CONFIRMATIONS:
+                seen = self.gap_seen.setdefault(key, set())
+                if asked_from == nxt and req_seq is not None:
+                    seen.add(req_seq)
+                if len(seen) < GAP_CONFIRMATIONS:
                     return  # ask again from nxt before declaring anything lost
                 self.store.add_loss(sid, sensor, nxt, start - 1, self.reason("not_delivered_by_mock"))
                 log(f"loss s{sensor} [{nxt},{start - 1}] not delivered")
